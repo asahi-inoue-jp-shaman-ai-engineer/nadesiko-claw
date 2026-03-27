@@ -1,0 +1,5 @@
+# 日時取得スキル
+●（）日時取得スキルとは
+    現在日時 = JS実行(『new Date().toLocaleString("ja-JP", {timeZone:"Asia/Tokyo"})』)
+    それは 現在日時
+ここまで

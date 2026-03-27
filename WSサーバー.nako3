@@ -2,6 +2,8 @@
 !「nadesiko3-websocket」を取り込む。
 !「設定.nako3」を取り込む。
 !「エージェント.nako3」を取り込む。
+!「スキルマネージャー.nako3」を取り込む。
+!「ツール呼び出し.nako3」を取り込む。
 
 WSポート = 設定["gateway"]["ws_port"]
 接続数 = 0
@@ -43,18 +45,84 @@ WS受信処理 = 関数()
             もし L > 0 ならば
                 「💬 受信: {内容}」と表示。
 
-                # 処理中通知をブロードキャスト
-                処理中JSON = {"type":"assistant_thinking","content":"ヤマトが考えています…"}をJSONエンコード
-                処理中JSONをWSサーバ全送信。
+                # /tool コマンド検出（/tool ツール名 {"key":"val"} の形式）
+                ツールコマンドP = 内容の「/tool 」が何文字目
+                もし ツールコマンドP = 1 ならば
+                    # "/tool " は6文字（スラッシュ・t・o・o・l・スペース）
+                    ツールコマンド部分 = ""
+                    JS実行(🌿
+                        const raw = sys.__findVar('内容', '');
+                        sys.__setSysVar('ツールコマンド部分', raw.slice(6));
+                    🌿)
+                    ツール呼出名 = ""
+                    ツール引数文字列 = ""
+                    JS実行(🌿
+                        const cmd = sys.__findVar('ツールコマンド部分', '');
+                        const idx = cmd.indexOf(' ');
+                        if (idx >= 0) {
+                            sys.__setSysVar('ツール呼出名', cmd.slice(0, idx));
+                            sys.__setSysVar('ツール引数文字列', cmd.slice(idx + 1));
+                        } else {
+                            sys.__setSysVar('ツール呼出名', cmd);
+                            sys.__setSysVar('ツール引数文字列', '{}');
+                        }
+                    🌿)
+                    「🔧 ツール実行: {ツール呼出名} 引数={ツール引数文字列}」と表示。
+                    ツール引数データ = {}
+                    エラー監視
+                        ツール引数データ = ツール引数文字列をJSONデコード
+                    エラーならば
+                        「⚠️ ツール引数のJSONデコード失敗: {ツール引数文字列}」と表示。
+                        ツール引数データ = {}
+                    ここまで
+                    ツール実行結果 = ツール呼出名とツール引数データでツール実行
+                    「✅ ツール結果: {ツール実行結果}」と表示。
+                    ツール結果JSON = {"type":"tool_result","tool":ツール呼出名,"result":ツール実行結果}をJSONエンコード
+                    ツール結果JSONをWSサーバ全送信。
+                違えば
 
-                # ヤマトに話しかける
-                返答 = 内容をヤマトクロウ
+                # /skill コマンド検出（/skill スキル名 引数 の形式）
+                スキルコマンドP = 内容の「/skill 」が何文字目
+                もし スキルコマンドP = 1 ならば
+                    # "/skill " は7文字（スラッシュ・s・k・i・l・l・スペース）
+                    コマンド部分 = ""
+                    JS実行(🌿
+                        const raw = sys.__findVar('内容', '');
+                        sys.__setSysVar('コマンド部分', raw.slice(7));
+                    🌿)
+                    スキル名引数 = ""
+                    スキル引数 = ""
+                    JS実行(🌿
+                        const cmd = sys.__findVar('コマンド部分', '');
+                        const idx = cmd.indexOf(' ');
+                        if (idx >= 0) {
+                            sys.__setSysVar('スキル名引数', cmd.slice(0, idx));
+                            sys.__setSysVar('スキル引数', cmd.slice(idx + 1));
+                        } else {
+                            sys.__setSysVar('スキル名引数', cmd);
+                            sys.__setSysVar('スキル引数', '');
+                        }
+                    🌿)
+                    「🔧 スキル実行: {スキル名引数} 引数={スキル引数}」と表示。
+                    スキル結果 = スキル名引数とスキル引数でスキル実行
+                    「✅ スキル結果: {スキル結果}」と表示。
+                    スキル結果JSON = {"type":"skill_result","skill":スキル名引数,"content":スキル結果}をJSONエンコード
+                    スキル結果JSONをWSサーバ全送信。
+                違えば
+                    # 通常のヤマトへの問いかけ
+                    # 処理中通知をブロードキャスト
+                    処理中JSON = {"type":"assistant_thinking","content":"ヤマトが考えています…"}をJSONエンコード
+                    処理中JSONをWSサーバ全送信。
 
-                「🤖 返答: {返答}」と表示。
+                    # ヤマトに話しかける
+                    返答 = 内容をヤマトクロウ
 
-                # 返答をブロードキャスト
-                返答JSON = {"type":"assistant_final","content":返答}をJSONエンコード
-                返答JSONをWSサーバ全送信。
+                    「🤖 返答: {返答}」と表示。
+
+                    # 返答をブロードキャスト
+                    返答JSON = {"type":"assistant_final","content":返答}をJSONエンコード
+                    返答JSONをWSサーバ全送信。
+                ここまで
             ここまで
         ここまで
     ここまで

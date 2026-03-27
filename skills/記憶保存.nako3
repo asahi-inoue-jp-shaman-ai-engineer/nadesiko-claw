@@ -1,0 +1,11 @@
+# 記憶保存スキル
+●（記憶データを）記憶保存スキルとは
+    存在確認 = 「./supabase_save.mjs」が存在
+    もし 存在確認 ならば
+        記憶データをJSONエンコードを「./tmp_save.json」に保存
+        結果文字列 = 「node ./supabase_save.mjs」を起動待機
+        それは 結果文字列
+    違えば
+        それは 「❌ supabase_save.mjsが見つかりません」
+    ここまで
+ここまで
