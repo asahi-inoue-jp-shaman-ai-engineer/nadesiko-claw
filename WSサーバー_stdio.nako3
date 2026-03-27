@@ -17,6 +17,9 @@
 
 # stdioメッセージ処理（sys.__execからコールバックされる）
 ●（受信テキストを）ヤマトジュシン処理とは
+    JS実行(🌿
+        process.stderr.write('[ヤマトジュシン処理] 開始: ' + sys.__findVar('受信テキスト', '').slice(0, 60) + '\n');
+    🌿)
     受信データ = {}
     エラー監視
         受信データ = 受信テキストをJSONデコード
@@ -125,7 +128,12 @@ JS実行(🌿
         for (const line of lines) {
             const trimmed = line.trim();
             if (trimmed) {
-                sys.__exec('ヤマトジュシン処理', [trimmed, sys]);
+                process.stderr.write('[stdin受信] ' + trimmed.slice(0, 60) + '\n');
+                try {
+                    sys.__exec('ヤマトジュシン処理', [trimmed, sys]);
+                } catch(e) {
+                    process.stderr.write('[エラー] sys.__exec失敗: ' + e.message + '\n');
+                }
             }
         }
     });
