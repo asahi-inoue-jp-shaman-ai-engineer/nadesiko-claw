@@ -28,11 +28,65 @@
         返答テキスト = 「❌ 応答の解析に失敗しました」
     ここまで
 
-    # 履歴に追加
-    アシスタント行 = {"role":"assistant","content":返答テキスト}
+    # [MEMORY] タグと [CUSTOM] タグを抽出してクリーンな返答を作る
+    抽出記憶リスト = []
+    クリーン返答 = 返答テキスト
+    カスタム抽出テキスト = ""
+    JS実行(🌿
+        const text = sys.__findVar('返答テキスト', '');
+        const memories = [];
+        const memRegex = /\[MEMORY\s+category="([^"]+)"\s+importance="(\d+)"\]([\s\S]*?)\[\/MEMORY\]/g;
+        let match;
+        while ((match = memRegex.exec(text)) !== null) {
+            memories.push({
+                category: match[1],
+                importance: parseInt(match[2]),
+                content: match[3].trim()
+            });
+        }
+        let cleaned = text.replace(memRegex, '');
+        let customText = '';
+        const customRegex = /\[CUSTOM\]([\s\S]*?)\[\/CUSTOM\]/g;
+        let customMatch;
+        while ((customMatch = customRegex.exec(text)) !== null) {
+            customText += customMatch[1].trim() + '\n';
+        }
+        cleaned = cleaned.replace(/\[CUSTOM\][\s\S]*?\[\/CUSTOM\]/g, '').trim();
+        sys.__setSysVar('抽出記憶リスト', memories);
+        sys.__setSysVar('クリーン返答', cleaned);
+        sys.__setSysVar('カスタム抽出テキスト', customText.trim());
+    🌿)
+
+    # [MEMORY] タグの内容をSupabaseに保存
+    記憶件数 = 抽出記憶リスト の配列要素数
+    もし 記憶件数 > 0 ならば
+        # supabase_save.mjs が存在するか確認してから保存
+        存在確認 = 「./supabase_save.mjs」が存在
+        もし 存在確認 ならば
+            保存データ = {"table":"yamato_memories","records":抽出記憶リスト}
+            保存データをJSONエンコードを「./tmp_save.json」に保存
+            「node ./supabase_save.mjs」を起動待機
+        ここまで
+    ここまで
+
+    # [CUSTOM] タグの内容をカスタム.md に追記
+    カスタム長さ = カスタム抽出テキスト の文字数
+    もし カスタム長さ > 0 ならば
+        既存カスタム = ""
+        エラー監視
+            既存カスタム = 「./カスタム.md」を読
+        エラーならば
+            既存カスタム = ""
+        ここまで
+        新カスタム内容 = 既存カスタム & 改行 & カスタム抽出テキスト
+        新カスタム内容を「./カスタム.md」に保存
+    ここまで
+
+    # 履歴にはクリーンな返答を追加
+    アシスタント行 = {"role":"assistant","content":クリーン返答}
     会話履歴にアシスタント行を配列プッシュ
 
-    それは 返答テキスト
+    それは クリーン返答
 ここまで
 
 # Claude API呼び出し（api_call.mjsを起動待機で同期実行）

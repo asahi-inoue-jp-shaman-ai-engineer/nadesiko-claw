@@ -132,7 +132,8 @@ ThinkingID = ""
 ●WebSocket接続とは
     JS実行(🌿
     (function() {
-        var ws = new WebSocket('ws://localhost:32123');
+        var wsHost = location.hostname || 'localhost';
+        var ws = new WebSocket('ws://' + wsHost + ':32123');
         ws.onopen  = function() { sys.__exec('WS接続完了', [sys]); };
         ws.onclose = function() {
             sys.__exec('WS切断処理', [sys]);
