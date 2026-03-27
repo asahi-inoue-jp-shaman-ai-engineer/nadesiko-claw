@@ -11,6 +11,42 @@ import { spawn } from 'child_process';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PORT = parseInt(process.env.PORT || '') || 32000;
 
+const SUPABASE_URL = 'https://dyimrnwbuzgcfeksezog.supabase.co';
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || '';
+
+async function saveMessage(role, content) {
+  if (!SUPABASE_KEY) return;
+  try {
+    await fetch(`${SUPABASE_URL}/rest/v1/yamato_messages`, {
+      method: 'POST',
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${SUPABASE_KEY}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=minimal'
+      },
+      body: JSON.stringify({ session_id: 'default', role, content })
+    });
+  } catch(e) { /* ignore */ }
+}
+
+async function loadHistory(limit = 50) {
+  if (!SUPABASE_KEY) return [];
+  try {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/yamato_messages?session_id=eq.default&order=created_at.asc&limit=${limit}`,
+      {
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`
+        }
+      }
+    );
+    if (!res.ok) return [];
+    return await res.json();
+  } catch(e) { return []; }
+}
+
 // MIMEタイプ
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -87,6 +123,12 @@ async function main() {
             try { ws.send(trimmed); } catch (_) {}
           }
         }
+        try {
+          const m = JSON.parse(trimmed);
+          if (m.type === 'assistant_final' && m.content) {
+            saveMessage('assistant', m.content);
+          }
+        } catch(e) {}
       } else {
         // ログ行
         console.log('[ヤマト]', trimmed);
@@ -135,8 +177,20 @@ async function main() {
     clients.add(ws);
     console.log(`🔗 WS接続: ${clients.size} クライアント`);
 
+    // 接続時に履歴を送る
+    loadHistory(50).then(history => {
+      if (history.length > 0 && ws.readyState === 1) {
+        ws.send(JSON.stringify({ type: 'history', messages: history }));
+      }
+    });
+
     ws.on('message', (data) => {
       const msg = data.toString();
+      let parsed;
+      try { parsed = JSON.parse(msg); } catch(e) {}
+      if (parsed?.type === 'user_message' && parsed.content) {
+        saveMessage('user', parsed.content);
+      }
       // ヤマトコアへ転送
       nakoProc.stdin.write(msg + '\n');
     });
