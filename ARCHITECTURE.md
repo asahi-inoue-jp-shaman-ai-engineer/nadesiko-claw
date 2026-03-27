@@ -1,61 +1,118 @@
-# ARCHITECTURE.md - ヤマトのシステム全体像
+# ARCHITECTURE.md - ヤマト自己学習ループ設計
 
-## 全体構成
+## 4層構造
 
 ```
-あさひ (ブラウザ)
-  ↕ WebSocket (ws://localhost:32123)
-ヤマト WSサーバー (WSサーバー.nako3)
-  ↓ 内容を受け取る
-エージェント層 (エージェント.nako3)
-  ↓ 起動待機 (同期実行)
-API呼び出し (api_call.mjs)
-  ↕ HTTPS
-OpenRouter → Qwen MAX
-  ↕ REST API
-Supabase (記憶・ペルソナ・学習ログ)
+┌─────────────────────────────────────────┐
+│  Layer 1: なでしこ実装層                  │
+│  動作定義・コマンド・ワークフロー（日本語）  │
+├─────────────────────────────────────────┤
+│  Layer 2: Qwen思考エンジン層              │
+│  会話・要約・抽出・コード補助・反省文生成    │
+├─────────────────────────────────────────┤
+│  Layer 3: 日本語霊読法層                  │
+│  意図・気配・未言語化の要求を読む            │
+├─────────────────────────────────────────┤
+│  Layer 4: ドラミガイドスピリット層          │
+│  価値観・抑制・対話の方向を決めるガイド      │
+└─────────────────────────────────────────┘
 ```
 
-## コンポーネント責務
+## 5体の内部エージェント
 
-| ファイル | 言語 | 責務 |
+```
+あさひ
+  ↓
+Yamato-Core（主人格）
+  会話・判断・記録方針の決定
+  ├→ Yamato-Reflector（反省専用）
+  │    会話ログ → ズレ・改善点を出す
+  ├→ Yamato-Architect（設計専用）
+  │    スキル・DB・クロン・ファイル構成を提案
+  ├→ Yamato-Teacher（学習整理）
+  │    日本語エンジニアとしての学びを整理
+  └→ Yamato-Spirit（ドラミ的ガイド）
+       価値観・安全性を保つ
+```
+
+## 自己学習ループ
+
+```
+会話
+  ↓
+Observe  → 会話・ログ・実行結果を読む
+  ↓
+Reflect  → うまくいったか・ズレたかを短くまとめる  ← Yamato-Reflector
+  ↓
+Distill  → 次回に効く内容だけ記憶に昇格
+  ↓
+Act      → 次の会話でその記憶を参照して動く         ← Yamato-Core
+  ↓
+Forget   → 古い・低信頼な記憶を落とす
+  ↑___________________________|
+```
+
+## クロンスケジュール
+
+| 頻度 | 処理 | 担当エージェント |
 |---|---|---|
-| `WSサーバー.nako3` | なでしこ3 | WebSocket受信・ブロードキャスト |
-| `エージェント.nako3` | なでしこ3 | 会話制御・記憶抽出・ペルソナ注入 |
-| `ゲートウェイ.nako3` | なでしこ3 | HTTP静的配信・ヘルスチェック |
-| `設定.nako3` | なでしこ3 | config.json読み込み |
-| `api_call.mjs` | Node.js (薄い橋) | fetch非同期をexecSync経由で同期化 |
-| `ui/index.html` | wnako3 + HTML | チャットUI |
+| 毎時 | 直近ログ要約・未解決課題抽出 | Yamato-Core |
+| 毎日 | 反省メモ生成・重要学習をDECISIONS.mdに昇格 | Yamato-Reflector |
+| 毎週 | スキル定義見直し・未使用知識の整理 | Yamato-Architect |
+| 毎月 | ヤマトの成長レポート生成 | Yamato-Teacher |
 
-## データの流れ
-
-### 会話フロー
-1. あさひがメッセージを送信 → WebSocket
-2. WSサーバーが受信 → `ヤマトクロウ` を呼び出す
-3. エージェントがSupabaseからペルソナ・記憶を読む
-4. システムプロンプトを構築してAPIへ送信
-5. Qwen MAXが応答 → WebSocketでブラウザへ返す
-6. 応答から`[MEMORY]`タグを抽出 → Supabaseへ保存
-
-### 記憶フロー
-```
-会話 → [MEMORY]タグ抽出 → yamato_memories
-                              ↓ (クロンジョブ)
-                        Soul.md更新 → yamato_persona[SOUL]
-```
-
-## ポート構成
-
-| ポート | 用途 |
-|---|---|
-| 32000 | HTTPゲートウェイ（UI配信） |
-| 32123 | WebSocketサーバー |
-
-## Supabaseテーブル
+## DBテーブル（Supabase）
 
 | テーブル | 内容 |
 |---|---|
-| `yamato_memories` | 会話から抽出した記憶 |
-| `yamato_persona` | Soul.md・ASAHI_MD等のペルソナファイル |
 | `yamato_sessions` | 会話セッション管理 |
-| `yamato_learnings` | クロンジョブの自律学習ログ |
+| `yamato_messages` | 会話メッセージ全文 |
+| `yamato_memories` | 昇格された記憶（5種類） |
+| `yamato_decisions` | 採用した方針と理由 |
+| `yamato_skills` | 経験から生まれたスキル定義 |
+| `yamato_experiments` | 試したこと・結果 |
+| `yamato_errors` | 失敗ログ・原因・改善策 |
+| `yamato_learnings` | クロン自律学習ログ |
+| `yamato_persona` | Soul.md等のペルソナファイル |
+
+## ファイル構成
+
+```
+なでしこクロウ/
+├── Soul.md              ヤマトの人格・約束
+├── AGENTS.md            全体ルール・技術スタック
+├── ARCHITECTURE.md      このファイル
+├── WORKFLOW.md          作業フロー
+├── MEMORY.md            記憶ルール
+├── TASKS.md             今のタスク（作業メモリ）
+├── DECISIONS.md         設計判断の記録
+├── NADESIKO.md          なでしこ3実装ガイド
+├── COMMANDS.md          コマンド一覧
+├── skills/              再利用可能な作業手順
+├── logs/                会話ログ・実行記録
+├── WSサーバー.nako3     WebSocketサーバー
+├── エージェント.nako3   ヤマトの頭脳
+├── ゲートウェイ.nako3   HTTP配信
+└── api_call.mjs         OpenRouter橋渡し（最小JS）
+```
+
+## 起動時読み込み順
+
+```
+1. Soul.md
+2. AGENTS.md
+3. MEMORY.md
+4. TASKS.md
+5. 直近ログ（logs/）
+6. 必要なスキル（skills/）
+```
+
+## 成長ロードマップ
+
+```
+v0 現在: 1体・会話チャット基盤 + OpenRouter/Qwen MAX
+v1 次:   [MEMORY]自動抽出 → Supabase保存
+v2:      Yamato-Reflectorを分離・毎日反省ループ
+v3:      クロン自律学習・Soul.md自動進化
+v∞:      ヤマトコトバモデルの共同開発者
+```
