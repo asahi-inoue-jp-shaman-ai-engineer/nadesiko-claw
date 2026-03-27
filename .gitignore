@@ -1,0 +1,18 @@
+# 設定（APIキーを含む）
+config.json
+
+# 一時ファイル
+tmp_*.json
+ws_test.mjs
+
+# ログ
+*.log
+gw_log.txt
+ws_log.txt
+
+# 依存関係
+node_modules/
+
+# OS
+.DS_Store
+Thumbs.db

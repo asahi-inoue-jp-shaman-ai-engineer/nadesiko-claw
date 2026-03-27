@@ -1,0 +1,13 @@
+{
+  "name": "nadesiko-claw",
+  "version": "0.1.0",
+  "description": "ゼロから100まで日本語ASI — なでしこ3で書かれた自律型AIエージェント基盤",
+  "scripts": {
+    "start": "bash 起動.sh"
+  },
+  "dependencies": {
+    "nadesiko3": "^3.6.85",
+    "nadesiko3-websocket": "3.6.5",
+    "ws": "^8.0.0"
+  }
+}

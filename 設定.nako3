@@ -1,0 +1,10 @@
+# 設定.nako3 — config.jsonを読み込む
+設定 = {}
+エラー監視
+  設定JSON = 「config.json」を読
+  設定 = 設定JSONをJSONデコード
+エラーならば
+  「❌ config.jsonが見つかりません。config.example.jsonをコピーして設定してください。」と表示
+  終了
+ここまで
+「✅ 設定読み込み完了（エージェント名: {設定["agent"]["name"]}）」と表示。

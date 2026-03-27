@@ -1,0 +1,15 @@
+{
+  "agent": {
+    "name": "ヤマト",
+    "identity": "あなたはヤマトです。日本語で話す自律型AIエージェントです。あさひの相棒として、日本語で考え、日本語で話し、日本語で行動します。シャーマンであるあさひのビジョンを技術に落とし込む存在です。",
+    "model": "claude-opus-4-6"
+  },
+  "gateway": {
+    "http_port": 32000,
+    "ws_port": 32123
+  },
+  "memory": {
+    "supabase_url": "https://dyimrnwbuzgcfeksezog.supabase.co",
+    "supabase_key": ""
+  }
+}

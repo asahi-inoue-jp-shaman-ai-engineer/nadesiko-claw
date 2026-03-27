@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ヤマト — なでしこクロウ</title>
+<style>
+  :root {
+    --bg:#08090f; --bg2:#0e1018; --bg3:#13151f; --border:#1e2130;
+    --gold:#c9a84c; --gold-dim:#7a6530;
+    --text:#e8e8f0; --text-dim:#888; --red:#e05a5a;
+    --user-bg:#1a1f35; --ai-bg:#0f1520;
+    --radius:12px; --font:'Hiragino Sans','Yu Gothic',sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg);color:var(--text);font-family:var(--font);height:100dvh;display:flex;flex-direction:column;}
+  .header{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:14px 18px;background:var(--bg2);border-bottom:1px solid var(--border);
+  }
+  .title{font-size:16px;color:var(--gold);letter-spacing:.2em;}
+  .ws-dot{width:8px;height:8px;border-radius:50%;background:var(--red);transition:background .3s;}
+  .ws-dot.online{background:#4ca84c;}
+  .messages{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:12px;}
+  .msg{max-width:88%;padding:12px 16px;border-radius:var(--radius);line-height:1.65;font-size:14px;word-break:break-word;}
+  .msg.user{align-self:flex-end;background:var(--user-bg);border:1px solid var(--border);}
+  .msg.ai{align-self:flex-start;background:var(--ai-bg);border:1px solid var(--border);}
+  .msg.thinking{align-self:flex-start;color:var(--text-dim);font-style:italic;font-size:13px;background:transparent;border:none;padding:4px 0;}
+  .msg .name{font-size:11px;color:var(--gold-dim);margin-bottom:6px;letter-spacing:.1em;}
+  .input-area{
+    padding:12px 16px;background:var(--bg2);border-top:1px solid var(--border);
+    display:flex;gap:10px;align-items:flex-end;
+  }
+  textarea{
+    flex:1;background:var(--bg3);color:var(--text);border:1px solid var(--border);
+    border-radius:var(--radius);padding:10px 14px;font-size:14px;font-family:var(--font);
+    resize:none;min-height:44px;max-height:140px;outline:none;
+    transition:border-color .2s;
+  }
+  textarea:focus{border-color:var(--gold-dim);}
+  button{
+    background:var(--gold);color:#08090f;border:none;border-radius:var(--radius);
+    padding:10px 18px;font-size:14px;font-weight:bold;cursor:pointer;
+    min-height:44px;white-space:nowrap;transition:opacity .2s;
+  }
+  button:disabled{opacity:.4;cursor:not-allowed;}
+  @media(max-width:600px){
+    .msg{max-width:96%;}
+    .header{padding:10px 14px;}
+  }
+</style>
+</head>
+<body>
+<div class="header">
+  <div class="title">ヤマト</div>
+  <div class="ws-dot" id="wsDot"></div>
+</div>
+<div class="messages" id="messages"></div>
+<div class="input-area">
+  <textarea id="ta" placeholder="ヤマトに話しかけよう..." rows="1"></textarea>
+  <button id="btn" disabled>送信</button>
+</div>
+
+<script src="wnako3.js"></script>
+<script type="なでしこ3">
+# ── UIヘルパーをwindowに事前登録（🌿ブロックは変数展開なし） ──
+JS実行(🌿
+window.nakoUI = {
+    addMsg: function(txt, klass, id) {
+        var div = document.createElement('div');
+        div.className = 'msg ' + klass;
+        div.id = id;
+        if (klass === 'ai') {
+            var nm = document.createElement('div');
+            nm.className = 'name';
+            nm.textContent = 'ヤマト';
+            div.appendChild(nm);
+        }
+        var ct = document.createElement('div');
+        ct.className = 'content';
+        ct.textContent = txt;
+        div.appendChild(ct);
+        var ms = document.getElementById('messages');
+        ms.appendChild(div);
+        ms.scrollTop = ms.scrollHeight;
+    },
+    updateMsg: function(id, txt) {
+        var el = document.getElementById(id);
+        if (!el) return;
+        var c = el.querySelector('.content');
+        if (c) c.textContent = txt;
+    },
+    deleteMsg: function(id) {
+        var el = document.getElementById(id);
+        if (el) el.remove();
+    },
+    sendWS: function(obj) {
+        if (window._ws && window._ws.readyState === 1) {
+            window._ws.send(JSON.stringify(obj));
+        }
+    }
+};
+🌿)
+
+# ── 状態変数 ──
+WS接続済み = 偽
+送信中 = 偽
+メッセージID = 0
+
+# ── DOM操作ヘルパー ──
+# TJ = [テキスト]をJSONエンコード → ["値"] を 🌴で展開 → {TJ}[0] で安全取得
+●（テキストとクラスを）メッセージ追加とは
+    メッセージID = メッセージID + 1
+    ID = 「msg-{メッセージID}」
+    TJ = [テキスト]をJSONエンコード
+    JS実行(🌴 window.nakoUI.addMsg({TJ}[0], '{クラス}', '{ID}') 🌴)
+    それは ID
+ここまで
+
+●（IDとテキストを）メッセージ更新とは
+    TJ = [テキスト]をJSONエンコード
+    JS実行(🌴 window.nakoUI.updateMsg('{ID}', {TJ}[0]) 🌴)
+ここまで
+
+●（IDを）メッセージ削除とは
+    JS実行(🌴 window.nakoUI.deleteMsg('{ID}') 🌴)
+ここまで
+
+# ── WebSocket接続 ──
+ThinkingID = ""
+
+●WebSocket接続とは
+    JS実行(🌿
+    (function() {
+        var ws = new WebSocket('ws://localhost:32123');
+        ws.onopen  = function() { sys.__exec('WS接続完了', [sys]); };
+        ws.onclose = function() {
+            sys.__exec('WS切断処理', [sys]);
+            setTimeout(function() { sys.__exec('WebSocket接続', [sys]); }, 3000);
+        };
+        ws.onmessage = function(e) {
+            try { sys.__exec('メッセージ受信', [JSON.parse(e.data), sys]); } catch(err) {}
+        };
+        window._ws = ws;
+    })()
+    🌿)
+ここまで
+
+●WS接続完了とは
+    WS接続済み = 真
+    JS実行(🌿 document.getElementById('wsDot').classList.add('online') 🌿)
+    JS実行(🌿 document.getElementById('btn').disabled = false 🌿)
+    「接続しました。ヤマトに話しかけてみてください。」と「thinking」をメッセージ追加。
+ここまで
+
+●WS切断処理とは
+    WS接続済み = 偽
+    JS実行(🌿 document.getElementById('wsDot').classList.remove('online') 🌿)
+    JS実行(🌿 document.getElementById('btn').disabled = true 🌿)
+ここまで
+
+# ── メッセージ受信 ──
+●（メッセージを）メッセージ受信とは
+    種類 = ""
+    もし 「type」が メッセージに辞書キー存在 ならば
+        種類 = メッセージ["type"]
+    ここまで
+    内容 = ""
+    もし 「content」が メッセージに辞書キー存在 ならば
+        内容 = メッセージ["content"]
+    ここまで
+
+    T1 = 種類の「assistant_thinking」が何文字目
+    もし T1 > 0 ならば
+        ThinkingID = 「ヤマト思考中…」と「thinking」をメッセージ追加
+        戻る。
+    ここまで
+
+    T2 = 種類の「assistant_final」が何文字目
+    もし T2 > 0 ならば
+        TL = ThinkingIDの文字数
+        もし TL > 0 ならば
+            ThinkingIDをメッセージ削除
+            ThinkingID = ""
+        ここまで
+        内容と「ai」をメッセージ追加
+        送信中 = 偽
+        JS実行(🌿 document.getElementById('btn').disabled = false 🌿)
+        戻る。
+    ここまで
+ここまで
+
+# ── 送信処理 ──
+●送信とは
+    テキスト = JS実行(🌿 document.getElementById('ta').value.trim() 🌿)
+    L = テキストの文字数
+    もし L = 0 ならば 戻る。
+    もし 送信中 ならば 戻る。
+    もし WS接続済み = 偽 ならば 戻る。
+
+    送信中 = 真
+    JS実行(🌿 document.getElementById('btn').disabled = true 🌿)
+    JS実行(🌿 document.getElementById('ta').value = '' 🌿)
+
+    テキストと「user」をメッセージ追加
+
+    # 送信データを配列JSONエンコードして安全に展開
+    SendJ = [{"type":"user_message","content":テキスト}]をJSONエンコード
+    JS実行(🌴 window.nakoUI.sendWS({SendJ}[0]) 🌴)
+ここまで
+
+# ── イベント設定 ──
+JS実行(🌿
+(function() {
+    document.getElementById('btn').addEventListener('click', function() {
+        sys.__exec('送信', [sys]);
+    });
+    document.getElementById('ta').addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            sys.__exec('送信', [sys]);
+        }
+    });
+    document.getElementById('ta').addEventListener('input', function(e) {
+        e.target.style.height = 'auto';
+        e.target.style.height = Math.min(e.target.scrollHeight, 140) + 'px';
+    });
+})()
+🌿)
+
+# ── 起動 ──
+WebSocket接続。
+</script>
+<script>
+// wnako3を手動起動
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', function() {
+    if (navigator.nako3) navigator.nako3.runNakoScript();
+  });
+} else {
+  if (navigator.nako3) navigator.nako3.runNakoScript();
+}
+</script>
+</body>
+</html>

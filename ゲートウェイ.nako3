@@ -1,0 +1,21 @@
+# ゲートウェイ.nako3 — HTTPサーバー（チャットUIを配信）
+!「plugin_httpserver.mjs」を取り込む。
+!「設定.nako3」を取り込む。
+
+HTTPポート = 設定["gateway"]["http_port"]
+
+# ヘルスチェック処理
+ヘルス処理 = 関数()
+    エージェント名 = 設定["agent"]["name"]
+    応答JSON = {"status":"ok","agent":エージェント名,"version":"0.1.0"}をJSONエンコード
+    200で{"Content-Type":"application/json; charset=utf-8","Access-Control-Allow-Origin":"*"}を簡易HTTPサーバヘッダ出力
+    応答JSONを簡易HTTPサーバ出力
+ここまで
+
+# 起動ハンドラ（ルート登録は全部ここの中）
+起動処理 = 関数()
+    「/」を「./ui/」に簡易HTTPサーバ静的パス指定。
+    ヘルス処理を「/api/health」に簡易HTTPサーバ受信時。
+    「🌐 HTTPゲートウェイ起動: http://localhost:{HTTPポート}」と表示
+ここまで
+起動処理をHTTPポートの簡易HTTPサーバ起動時。
