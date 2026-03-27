@@ -137,10 +137,8 @@ async function main() {
 
     ws.on('message', (data) => {
       const msg = data.toString();
-      console.log('[WS→stdin]', msg.slice(0, 80));
       // ヤマトコアへ転送
       nakoProc.stdin.write(msg + '\n');
-      console.log('[WS→stdin] 送信完了');
     });
 
     ws.on('close', () => {

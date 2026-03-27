@@ -9,17 +9,14 @@
 
 # JSON1行をstdoutに出力（統合サーバーがWSクライアントへ転送する）
 ●（メッセージを）ヤマトブロードキャストとは
-    JS実行(🌿
-        const msg = sys.__findVar('メッセージ', '');
-        process.stdout.write(msg + '\n');
-    🌿)
+    TJ = [メッセージ]をJSONエンコード
+    JS実行(🌴
+        process.stdout.write({TJ}[0] + '\n');
+    🌴)
 ここまで
 
 # stdioメッセージ処理（sys.__execからコールバックされる）
 ●（受信テキストを）ヤマトジュシン処理とは
-    JS実行(🌿
-        process.stderr.write('[ヤマトジュシン処理] 開始: ' + sys.__findVar('受信テキスト', '').slice(0, 60) + '\n');
-    🌿)
     受信データ = {}
     エラー監視
         受信データ = 受信テキストをJSONデコード
@@ -128,7 +125,6 @@ JS実行(🌿
         for (const line of lines) {
             const trimmed = line.trim();
             if (trimmed) {
-                process.stderr.write('[stdin受信] ' + trimmed.slice(0, 60) + '\n');
                 try {
                     sys.__exec('ヤマトジュシン処理', [trimmed, sys]);
                 } catch(e) {
