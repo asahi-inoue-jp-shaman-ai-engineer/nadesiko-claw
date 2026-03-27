@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "ゼロから100まで日本語ASI — なでしこ3で書かれた自律型AIエージェント基盤",
   "scripts": {
-    "start": "bash 起動.sh"
+    "start": "node 統合サーバー.mjs"
   },
   "dependencies": {
     "nadesiko3": "^3.6.85",

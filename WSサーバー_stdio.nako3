@@ -1,0 +1,135 @@
+# WSサーバー_stdio.nako3 — stdin/stdout経由でヤマトと通信（Railway対応）
+# 統合サーバー.mjs からサブプロセスとして起動される
+# stdin: JSON行（ユーザーメッセージ）
+# stdout: JSON行（ヤマトの返答）← 統合サーバーがWSクライアントへ転送
+!「設定.nako3」を取り込む。
+!「エージェント.nako3」を取り込む。
+!「スキルマネージャー.nako3」を取り込む。
+!「ツール呼び出し.nako3」を取り込む。
+
+# JSON1行をstdoutに出力（統合サーバーがWSクライアントへ転送する）
+●（メッセージを）ヤマトブロードキャストとは
+    JS実行(🌿
+        const msg = sys.__findVar('メッセージ', '');
+        process.stdout.write(msg + '\n');
+    🌿)
+ここまで
+
+# stdioメッセージ処理（sys.__execからコールバックされる）
+●（受信テキストを）ヤマトジュシン処理とは
+    受信データ = {}
+    エラー監視
+        受信データ = 受信テキストをJSONデコード
+    エラーならば
+        JS実行(🌿
+            process.stderr.write('⚠️ JSONデコード失敗: ' + sys.__findVar('受信テキスト', '') + '\n');
+        🌿)
+        戻る。
+    ここまで
+
+    種類 = ""
+    もし 「type」が 受信データに辞書キー存在 ならば
+        種類 = 受信データ["type"]
+    ここまで
+
+    内容 = ""
+    もし 「content」が 受信データに辞書キー存在 ならば
+        内容 = 受信データ["content"]
+    ここまで
+
+    # user_message 処理
+    種類P = 種類の「user_message」が何文字目
+    もし 種類P > 0 ならば
+        L = 内容の文字数
+        もし L > 0 ならば
+            # /tool コマンド検出
+            ツールP = 内容の「/tool 」が何文字目
+            もし ツールP = 1 ならば
+                ツール部分 = ""
+                JS実行(🌿
+                    const raw = sys.__findVar('内容', '');
+                    sys.__setSysVar('ツール部分', raw.slice(6));
+                🌿)
+                ツール名 = ""
+                ツール引数文字列 = ""
+                JS実行(🌿
+                    const cmd = sys.__findVar('ツール部分', '');
+                    const idx = cmd.indexOf(' ');
+                    if (idx >= 0) {
+                        sys.__setSysVar('ツール名', cmd.slice(0, idx));
+                        sys.__setSysVar('ツール引数文字列', cmd.slice(idx + 1));
+                    } else {
+                        sys.__setSysVar('ツール名', cmd);
+                        sys.__setSysVar('ツール引数文字列', '{}');
+                    }
+                🌿)
+                ツール引数 = {}
+                エラー監視
+                    ツール引数 = ツール引数文字列をJSONデコード
+                エラーならば
+                    ツール引数 = {}
+                ここまで
+                ツール結果 = ツール名とツール引数でツール実行
+                ツール結果JSON = {"type":"tool_result","tool":ツール名,"result":ツール結果}をJSONエンコード
+                ツール結果JSONをヤマトブロードキャスト
+                戻る。
+            ここまで
+
+            # /skill コマンド検出
+            スキルP = 内容の「/skill 」が何文字目
+            もし スキルP = 1 ならば
+                スキル部分 = ""
+                JS実行(🌿
+                    const raw = sys.__findVar('内容', '');
+                    sys.__setSysVar('スキル部分', raw.slice(7));
+                🌿)
+                スキル名 = ""
+                スキル引数 = ""
+                JS実行(🌿
+                    const cmd = sys.__findVar('スキル部分', '');
+                    const idx = cmd.indexOf(' ');
+                    if (idx >= 0) {
+                        sys.__setSysVar('スキル名', cmd.slice(0, idx));
+                        sys.__setSysVar('スキル引数', cmd.slice(idx + 1));
+                    } else {
+                        sys.__setSysVar('スキル名', cmd);
+                        sys.__setSysVar('スキル引数', '');
+                    }
+                🌿)
+                スキル結果 = スキル名とスキル引数でスキル実行
+                スキル結果JSON = {"type":"skill_result","skill":スキル名,"content":スキル結果}をJSONエンコード
+                スキル結果JSONをヤマトブロードキャスト
+                戻る。
+            ここまで
+
+            # 通常のメッセージ → ヤマトクロウへ
+            処理中JSON = {"type":"assistant_thinking","content":"ヤマトが考えています…"}をJSONエンコード
+            処理中JSONをヤマトブロードキャスト
+
+            返答 = 内容をヤマトクロウ
+
+            返答JSON = {"type":"assistant_final","content":返答}をJSONエンコード
+            返答JSONをヤマトブロードキャスト
+        ここまで
+    ここまで
+ここまで
+
+# stdinをイベント駆動で読む
+JS実行(🌿
+    let buf = '';
+    process.stdin.setEncoding('utf8');
+    process.stdin.on('data', (chunk) => {
+        buf += chunk;
+        const lines = buf.split('\n');
+        buf = lines.pop();
+        for (const line of lines) {
+            const trimmed = line.trim();
+            if (trimmed) {
+                sys.__exec('ヤマトジュシン処理', [trimmed, sys]);
+            }
+        }
+    });
+    process.stdin.resume();
+🌿)
+
+JS実行(🌿 process.stderr.write('[stdio] ヤマトコア待機中...\n') 🌿)
