@@ -1,4 +1,7 @@
-# WORKFLOW.md - ヤマトの作業フロー
+# WORKFLOW.md 生成スクリプト
+# 使い方: cnako3 WORKFLOW生成.nako3
+
+md内容 = 『# WORKFLOW.md - ヤマトの作業フロー
 
 ## 目的
 ヤマトは、会話・実装・記憶更新をひとつの流れとして扱います。
@@ -102,3 +105,7 @@ http://localhost:32000
 - `NADESIKO.md`: なでしこ実装ガイド
 - `MEMORY.md`: 記憶ルール
 - `DECISIONS.md`: 採用した方針と理由
+』
+
+md内容を「./WORKFLOW.md」に保存。
+「✅ WORKFLOW.md を生成しました。」と表示。
