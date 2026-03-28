@@ -91,18 +91,22 @@ async function main() {
   // WSクライアント管理
   const clients = new Set();
 
-  // cnako3 のパス（ローカルインストール優先）
+  // cnako3 のパス（ローカルインストール優先・完全パス指定で確実に解決）
   const localBin = join(__dirname, 'node_modules', '.bin');
+  const cnakoExe = process.platform === 'win32'
+    ? join(localBin, 'cnako3.cmd')
+    : join(localBin, 'cnako3');
   const pathSep = process.platform === 'win32' ? ';' : ':';
   const childEnv = { ...process.env, PATH: localBin + pathSep + (process.env.PATH || '') };
 
   // ヤマトコアプロセス（永続的なnadesiko3プロセス）
   // stdin: JSON行（WSクライアントからのメッセージ）
   // stdout: JSON行（WSクライアントへのレスポンス） + ログ行（そのまま表示）
-  const nakoProc = spawn('cnako3', ['WSサーバー_stdio.nako3'], {
+  const nakoProc = spawn(cnakoExe, ['WSサーバー_stdio.nako3'], {
     stdio: ['pipe', 'pipe', 'inherit'],
     cwd: __dirname,
     env: childEnv,
+    shell: process.platform === 'win32', // Windowsのみshell必要
   });
 
   // stdoutをバッファリング → 1行ずつ処理

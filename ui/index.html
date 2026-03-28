@@ -64,12 +64,44 @@
     margin-bottom: 4px;
     font-style: normal;
   }
+  /* メール通知カード */
+  .msg.mail {
+    align-self: flex-start;
+    background: rgba(201,168,76,0.08);
+    border: 1px solid rgba(201,168,76,0.45);
+    max-width: 95%;
+    padding: 12px 14px;
+  }
+  .mail-header {
+    font-size: 11px; color: var(--gold); margin-bottom: 6px;
+    letter-spacing: .05em;
+  }
+  .mail-subject { font-size: 13px; font-weight: bold; margin-bottom: 6px; }
+  .mail-body {
+    font-size: 12px; color: var(--text-dim);
+    white-space: pre-wrap; line-height: 1.55; margin-bottom: 8px;
+    max-height: 120px; overflow-y: auto;
+  }
+  .mail-reply-draft {
+    font-size: 12px; color: var(--gold-dim); font-style: italic;
+    border-left: 2px solid var(--gold-dim); padding-left: 8px; margin-bottom: 10px;
+  }
+  .mail-actions { display: flex; gap: 8px; }
+  .mail-btn {
+    padding: 5px 14px; border-radius: 8px; border: none;
+    font-size: 12px; cursor: pointer; font-family: var(--font);
+  }
+  .mail-btn.reply { background: var(--gold); color: #08090f; font-weight: bold; }
+  .mail-btn.later {
+    background: transparent; border: 1px solid var(--border); color: var(--text-dim);
+  }
   @media(max-width:600px){
     .msg{max-width:96%;}
     .header{padding:10px 14px;}
   }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 </head>
 <body>
 <div class="header">
@@ -282,6 +314,92 @@ if (document.readyState === 'loading') {
 }
 </script>
 <script>
+// ── Supabase Realtime — dev_mailbox 新着監視 ──
+(function() {
+  var SUPA_URL = 'https://dyimrnwbuzgcfeksezog.supabase.co';
+  var SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR5aW1ybndidXpnY2Zla3Nlem9nIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAzOTQ1NDcsImV4cCI6MjA4NTk3MDU0N30.aegtM0cxzuO-rdB-tiXZtRyqKPfrMWHtkBZc9XalVmE';
+
+  var sb = supabase.createClient(SUPA_URL, SUPA_KEY);
+
+  // 返信案を生成（シンプルな一言）
+  function buildReplyDraft(mail) {
+    return 'ヤマトより、' + mail.from_agent + 'へ：「' + mail.subject + '」受け取りました。';
+  }
+
+  // メール通知カードをチャット画面に挿入
+  function showMailCard(mail) {
+    var draft = buildReplyDraft(mail);
+    var cardId = 'mail-' + mail.id;
+
+    var card = document.createElement('div');
+    card.className = 'msg mail';
+    card.id = cardId;
+    card.innerHTML =
+      '<div class="mail-header">📬 dev_mailbox — ' + mail.from_agent + ' より</div>' +
+      '<div class="mail-subject">' + escHtml(mail.subject) + '</div>' +
+      '<div class="mail-body">' + escHtml(mail.content) + '</div>' +
+      '<div class="mail-reply-draft">返信案：' + escHtml(draft) + '</div>' +
+      '<div class="mail-actions">' +
+        '<button class="mail-btn reply" onclick="window.mailReply(' + mail.id + ', \'' + escAttr(mail.from_agent) + '\', \'' + escAttr(mail.subject) + '\', \'' + escAttr(draft) + '\', \'' + cardId + '\')">返信する</button>' +
+        '<button class="mail-btn later" onclick="document.getElementById(\'' + cardId + '\').remove()">後で</button>' +
+      '</div>';
+
+    var ms = document.getElementById('messages');
+    ms.appendChild(card);
+    ms.scrollTop = ms.scrollHeight;
+  }
+
+  function escHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+  function escAttr(s) {
+    return String(s).replace(/'/g,"\\'").replace(/\n/g,' ');
+  }
+
+  // 返信ボタン処理（グローバルに公開）
+  window.mailReply = function(mailId, toAgent, subject, draft, cardId) {
+    // dev_mailboxに返信をINSERT
+    sb.from('dev_mailbox').insert({
+      from_agent: 'ヤマト',
+      to_agent: toAgent,
+      subject: 'Re: ' + subject,
+      content: draft,
+      message_type: 'memo',
+      status: 'unread',
+      priority: 'normal'
+    }).then(function() {
+      // 元メールをread済みにマーク
+      sb.from('dev_mailbox')
+        .update({ read_at: new Date().toISOString(), status: 'read' })
+        .eq('id', mailId);
+      // カードを「返信済み」表示に変える
+      var card = document.getElementById(cardId);
+      if (card) {
+        var actions = card.querySelector('.mail-actions');
+        if (actions) actions.innerHTML = '<span style="font-size:12px;color:var(--gold-dim);">✓ 返信しました</span>';
+      }
+    });
+  };
+
+  // Realtime チャンネル購読
+  sb.channel('yamato-mailbox')
+    .on('postgres_changes', {
+      event: 'INSERT',
+      schema: 'public',
+      table: 'dev_mailbox'
+    }, function(payload) {
+      var mail = payload.new;
+      if (mail.to_agent === 'ヤマト' || mail.to_agent === '全員') {
+        showMailCard(mail);
+      }
+    })
+    .subscribe(function(status) {
+      if (status === 'SUBSCRIBED') {
+        console.log('[mailbox] Realtime 購読開始');
+      }
+    });
+})();
+
 // iOS Safari キーボード対応
 if (window.visualViewport) {
   window.visualViewport.addEventListener('resize', function() {
